@@ -1,4 +1,3 @@
-from asyncio.windows_events import NULL
 import pygame
 import math
 
@@ -7,7 +6,7 @@ from data.scripts.core import img
 # ----- setup
 pygame.init()
 clock = pygame.time.Clock()
-screen_w = 600
+screen_w = 800
 screen_h = 600
 screen = pygame.display.set_mode((screen_w, screen_h), 0, 32)
 pygame.mouse.set_visible(False)
@@ -20,12 +19,13 @@ class Player:
         self.orig_image = self.image
         self.rect = self.image.get_rect(center=(x, y))
 
-        self.vel = 4
+        self.vel = 5
         self.orig_vel = self.vel
-
+        self.health_start = 3
+        self.health_remaining = 3
         self.dash = False
         self.dash_cooldown = 2000
-        self.last_dash = NULL
+        self.last_dash = 0
         self.on_dash = False
 
         self.diagonal = False
@@ -66,6 +66,7 @@ class Player:
         if key[pygame.K_s]:
             self.rect.y += self.vel
 
+        pygame.draw.rect(screen, (99, 99, 99), (self.rect.x, (self.rect.y + 40), int(self.rect.width * (self.health_remaining / self.health_start)), 8))
 
 class Weapons:
     def __init__(self, x, y):
@@ -75,14 +76,20 @@ class Weapons:
         self.direction = True
         self.cooldown = 500
         self.last_shot = pygame.time.get_ticks()
+        self.gun_spinning = False
         self.facing_r = True
         self.recoil = False
+        self.angle = 0
 
     def rotate(self):
-
+        time_now = pygame.time.get_ticks()
         angle_d = math.degrees(cursor.angle_r)
+        self.angle = angle_d
 
-        self.image = pygame.transform.rotate(self.orig_image, -angle_d)
+        if self.gun_spinning:
+            self.angle += math.sin(time_now/60) * 20
+
+        self.image = pygame.transform.rotate(self.orig_image, -self.angle)
         self.rect = self.image.get_rect(center=(math.cos(cursor.angle_r) * 24 + player.rect.centerx,
                                                 math.sin(cursor.angle_r) * 32 + player.rect.centery))
 
@@ -102,13 +109,17 @@ class Weapons:
     def update(self):
 
         time_now = pygame.time.get_ticks()
+        if time_now - self.last_shot > self.cooldown:
+            if pygame.mouse.get_pressed()[0]:
+                self.recoil = True
+                bullet = Bullets(self.rect.centerx,
+                                self.rect.centery, cursor.angle_r)
+                bullet_group.add(bullet)
+                self.last_shot = time_now
 
-        if pygame.mouse.get_pressed()[0] and time_now - self.last_shot > self.cooldown:
-            self.recoil = True
-            bullet = Bullets(self.rect.centerx,
-                             self.rect.centery, cursor.angle_r)
-            bullet_group.add(bullet)
-            self.last_shot = time_now
+            self.gun_spinning = False
+        else: 
+            self.gun_spinning = True
 
         self.rotate()
 
@@ -136,8 +147,8 @@ class Bullets(pygame.sprite.Sprite):
 
         self.dx = math.cos(angle) * 10
         self.dy = math.sin(angle) * 10
-        self.x = x + self.dx * 1.5
-        self.y = y + self.dy * 1.5
+        self.x = x + self.dx * 2
+        self.y = y + self.dy * 2
         self.angle = angle
 
     def update(self):
@@ -149,7 +160,7 @@ class Bullets(pygame.sprite.Sprite):
         self.y += self.dy
         self.rect.center = int(self.x), int(self.y)
 
-        if self.rect.centerx > 600 or self.rect.centerx < 0 or self.rect.centery < 0 or self.rect.centery > 600:
+        if self.rect.centerx > screen_w or self.rect.centerx < 0 or self.rect.centery < 0 or self.rect.centery > screen_h:
             self.kill()
 
 
